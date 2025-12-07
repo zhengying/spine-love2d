@@ -104,11 +104,15 @@ function love.draw()
     love.graphics.clear(0.2, 0.2, 0.2)
     
     -- Draw skeleton
-    love.graphics.push()
-    love.graphics.translate(400, 500)
-    love.graphics.scale(1, -1)
-    renderer:draw(skeleton)
-    love.graphics.pop()
+    local instance = {
+        skeleton = skeleton,
+        renderer = renderer.renderer
+    }
+    spine.draw(instance, 400, 500)
+    
+    if renderer.debug then
+        spine.drawDebug(instance, 400, 500)
+    end
     
     -- Draw UI
     love.graphics.setColor(1, 1, 1)

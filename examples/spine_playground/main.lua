@@ -8,7 +8,7 @@ local spine = require("spine-love2d")
 -- Configuration: Change these to load different Spine characters
 local CONFIG = {
     -- Current asset to load (options: "spineboy", "coin", "windmill", "mix_and_match")
-    currentAsset = "spineboy_pro",
+    currentAsset = "mix_and_match",
     
     -- Asset paths
     assets = {
@@ -143,7 +143,6 @@ function love.load()
     love.window.setTitle("Spine Playground - Interactive Animation Viewer")
     love.window.setMode(1024, 768)
     love.graphics.setBackgroundColor(playground.backgroundColor)
-    playground.renderFlipY = true -- Default to flipping Y for Spine (Y-up) to Love2D (Y-down)
     
     -- Update CONFIG to center assets on screen
     local centerX = love.graphics.getWidth() / 2
@@ -380,18 +379,16 @@ function love.draw()
     love.graphics.clear(playground.backgroundColor)
     
     -- Draw skeleton
-    love.graphics.push()
-    love.graphics.translate(playground.skeletonX, playground.skeletonY)
-    local scaleY = playground.scale
-    if playground.renderFlipY then
-        scaleY = -playground.scale
+    local instance = {
+        skeleton = playground.skeleton,
+        renderer = playground.renderer.renderer
+    }
+    
+    spine.draw(instance, playground.skeletonX, playground.skeletonY, playground.scale, -playground.scale)
+    
+    if playground.showDebug then
+        spine.drawDebug(instance, playground.skeletonX, playground.skeletonY, playground.scale, -playground.scale)
     end
-    love.graphics.scale(playground.scale, scaleY)
-    
-    playground.renderer:setDebug(playground.showDebug)
-    playground.renderer:draw(playground.skeleton)
-    
-    love.graphics.pop()
     
     -- Draw UI
     drawUI()
@@ -543,9 +540,6 @@ function love.keypressed(key)
         end
     elseif key == "h" then
         playground.showHelp = not playground.showHelp
-    elseif key == "f" then
-        playground.renderFlipY = not playground.renderFlipY
-        print("Render Flip Y: " .. tostring(playground.renderFlipY))
     elseif key == "y" then
         if playground.skeleton then
             playground.skeleton.flipY = not playground.skeleton.flipY

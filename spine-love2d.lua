@@ -172,7 +172,7 @@ function spine.draw(instance, x, y, scaleX, scaleY, rotation)
   x = x or 0
   y = y or 0
   scaleX = scaleX or 1
-  scaleY = scaleY or 1
+  scaleY = scaleY or -1
   rotation = rotation or 0
   
   local startTime = love.timer.getTime()
@@ -188,7 +188,7 @@ function spine.draw(instance, x, y, scaleX, scaleY, rotation)
   love.graphics.rotate(rotation)
   love.graphics.scale(scaleX, scaleY)
   
-  instance.renderer:render(instance.skeleton, instance.atlas)
+  instance.renderer:drawSkeleton(instance.skeleton)
   
   -- Debug rendering
   if spine.debug then
@@ -202,13 +202,19 @@ end
 
 -- Debug rendering
 function spine.drawDebug(instance, x, y, scaleX, scaleY, rotation)
+  x = x or 0
+  y = y or 0
+  scaleX = scaleX or 1
+  scaleY = scaleY or -1
+  rotation = rotation or 0
+
   love.graphics.push()
   love.graphics.translate(x, y)
   love.graphics.rotate(rotation)
   love.graphics.scale(scaleX, scaleY)
   
   -- Use the renderer's debug rendering
-  instance.renderer:renderDebug(instance.skeleton)
+  instance.renderer:drawDebugSkeleton(instance.skeleton)
   
   love.graphics.pop()
 end
