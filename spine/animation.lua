@@ -460,7 +460,7 @@ function ColorTimeline:apply(skeleton, lastTime, time, events, alpha, blend, dir
     local a = 0
 
     if time >= frames[#frames - 4] then
-        local i = #frames - 4
+        local i = #frames - 3
         r = frames[i]
         g = frames[i + 1]
         b = frames[i + 2]

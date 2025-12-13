@@ -8,7 +8,7 @@ local spine = require("spine-love2d")
 -- Configuration: Change these to load different Spine characters
 local CONFIG = {
     -- Current asset to load (options: "spineboy", "coin", "windmill", "mix_and_match")
-    currentAsset = "cloud_pot",
+    currentAsset = "powerup",
     
     -- Asset paths
     assets = {
@@ -87,6 +87,13 @@ local CONFIG = {
             atlas = "assets/cloud-pot/cloud-pot.atlas",
             json = "assets/cloud-pot/cloud-pot.json",
             scale = 0.5,
+            x = 400,
+            y = 550
+        },
+        powerup = {
+            atlas = "assets/powerup/powerup.atlas",
+            json = "assets/powerup/powerup-pro.json",
+            scale = 1,
             x = 400,
             y = 550
         },
