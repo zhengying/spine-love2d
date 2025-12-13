@@ -78,26 +78,12 @@ function Renderer:drawSkeleton(skeleton)
     -- skeleton:updateWorldTransform() -- Already called in update
     
     local drawOrder = skeleton.drawOrder
-    local orderedSlots = {}
-    local rainSlots = {}
-    for i, slot in ipairs(drawOrder) do
-        local sname = slot.data.name or ""
-        local aname = (slot.attachment and slot.attachment.name) or ""
-        if string.find(sname, "rain") or string.find(aname, "rain") then
-            table.insert(rainSlots, slot)
-        else
-            table.insert(orderedSlots, slot)
-        end
-    end
-    for i = 1, #rainSlots do
-        table.insert(orderedSlots, rainSlots[i])
-    end
     local clipper = nil
     local clippingEndSlot = nil
     local shouldEndClipping = false
     local clippingStartIndex = nil
     
-    for i, slot in ipairs(orderedSlots) do
+    for i, slot in ipairs(drawOrder) do
         local attachment = slot.attachment
         
         -- Check if we should end clipping from previous iteration
@@ -177,7 +163,16 @@ function Renderer:drawClipping(slot, clipping)
         end
         
         if valid then
-            love.graphics.polygon("fill", worldVertices)
+            -- Triangulate the polygon to handle concave shapes correctly
+            local success, triangles = pcall(love.math.triangulate, worldVertices)
+            if success and triangles then
+                for _, triangle in ipairs(triangles) do
+                    love.graphics.polygon("fill", triangle)
+                end
+            else
+                -- Fallback to standard polygon drawing if triangulation fails
+                love.graphics.polygon("fill", worldVertices)
+            end
         else
             print("WARNING: Invalid vertices for clipping attachment: " .. (clipping.name or "unknown"))
         end
@@ -190,7 +185,18 @@ function Renderer:drawAttachment(slot, attachment)
     
     -- Apply slot color
     local color = slot.color
-    love.graphics.setColor(color.r, color.g, color.b, color.a)
+    
+    -- Check if we need to premultiply alpha (for PMA textures)
+    local pma = false
+    if attachment.region and attachment.region.page and attachment.region.page.pma then
+        pma = true
+    end
+    
+    if pma then
+        love.graphics.setColor(color.r * color.a, color.g * color.a, color.b * color.a, color.a)
+    else
+        love.graphics.setColor(color.r, color.g, color.b, color.a)
+    end
 
     local type = attachment.type
     
@@ -224,7 +230,7 @@ function Renderer:drawRegionAttachment(slot, attachment)
         end
     end
     
-    -- Removed rain debug red dot
+    -- Use white vertex color; rely on global love.graphics.setColor for slot tint
     local r, g, b, a = 255, 255, 255, 255
     
     local meshData = {
@@ -326,8 +332,6 @@ function Renderer:drawMeshAttachment(slot, attachment)
             return
         end
     end
-    
-    -- Removed rain debug red dot
     
     -- Use white vertex color; rely on global love.graphics.setColor for slot tint
     local r, g, b, a = 255, 255, 255, 255

@@ -1,11 +1,11 @@
--- Spine Love2D Runtime - Data loader module
--- Parses and loads Spine JSON format
+-- Spine Love2D Runtime - 数据加载模块
+-- 负责解析和加载Spine JSON数据格式
 
 local data = {}
 local utils = require("spine.utils")
 local math_module = require("spine.math")
 
--- Base data class
+-- 基础数据类
 local BaseData = {}
 BaseData.__index = BaseData
 
@@ -13,7 +13,7 @@ function BaseData.new()
   return setmetatable({}, BaseData)
 end
 
--- Bone data
+-- 骨骼数据
 local BoneData = setmetatable({}, {__index = BaseData})
 BoneData.__index = BoneData
 
@@ -51,7 +51,7 @@ function BoneData:copy()
   return copy
 end
 
--- Slot data
+-- 插槽数据
 local SlotData = setmetatable({}, {__index = BaseData})
 SlotData.__index = SlotData
 
@@ -77,7 +77,7 @@ function SlotData:copy()
   return copy
 end
 
--- Attachment base class
+-- 附件数据基类
 local Attachment = setmetatable({}, {__index = BaseData})
 Attachment.__index = Attachment
 
@@ -87,7 +87,7 @@ function Attachment.new(name)
   return self
 end
 
--- Region attachment
+-- 区域附件
 local RegionAttachment = setmetatable({}, {__index = Attachment})
 RegionAttachment.__index = RegionAttachment
 
@@ -303,7 +303,7 @@ function RegionAttachment:computeWorldVertices(bone, worldVertices)
   worldVertices[16] = uvs[6]
 end
 
--- Mesh attachment
+-- 网格附件
 local MeshAttachment = setmetatable({}, {__index = Attachment})
 MeshAttachment.__index = MeshAttachment
 
@@ -378,7 +378,7 @@ function MeshAttachment:updateRegion()
   end
 end
 
--- Path attachment
+-- 路径附件
 local PathAttachment = setmetatable({}, {__index = Attachment})
 PathAttachment.__index = PathAttachment
 
@@ -564,7 +564,7 @@ function MeshAttachment:computeWorldVertices(slot, worldVertices)
       end
     end
   else
-    -- Weighted vertices; compute with bone transforms
+    -- 有骨骼权重，需要计算
     local w = 0
     local v = 1
     local b = 1
@@ -604,7 +604,7 @@ function MeshAttachment:computeWorldVertices(slot, worldVertices)
   end
 end
 
--- Bounding box attachment
+-- 边界框附件
 local BoundingBoxAttachment = setmetatable({}, {__index = Attachment})
 BoundingBoxAttachment.__index = BoundingBoxAttachment
 
@@ -617,7 +617,7 @@ function BoundingBoxAttachment.new(name)
   return self
 end
 
--- Clipping attachment
+-- 剪裁附件
 local ClippingAttachment = setmetatable({}, {__index = Attachment})
 ClippingAttachment.__index = ClippingAttachment
 
@@ -625,24 +625,69 @@ function ClippingAttachment.new(name)
   local self = setmetatable(Attachment.new(name), ClippingAttachment)
   self.type = "clipping"
   self.endSlot = nil
+  self.vertexCount = 0
+  self.vertices = {}
+  self.bones = {}
+  self.weights = {}
+  self.worldVerticesLength = 0
   return self
 end
 
 function ClippingAttachment:computeWorldVertices(slot, worldVertices)
+  local skeleton = slot.bone.skeleton
   local vertices = self.vertices
-  local bone = slot.bone
-  local x = bone.worldX
-  local y = bone.worldY
-  local a = bone.a
-  local b = bone.b
-  local c = bone.c
-  local d = bone.d
+  local bones = self.bones
+  local weights = self.weights
+  local vertexCount = self.vertexCount
 
-  for i = 1, #vertices, 2 do
-      local vx = vertices[i]
-      local vy = vertices[i + 1]
-      worldVertices[i] = vx * a + vy * b + x
-      worldVertices[i + 1] = vx * c + vy * d + y
+  if #bones == 0 then
+    -- No bone weights - transform vertices by slot's bone
+    local bone = slot.bone
+    local x = bone.worldX
+    local y = bone.worldY
+    local a = bone.a
+    local b = bone.b
+    local c = bone.c
+    local d = bone.d
+
+    for i = 1, #vertices, 2 do
+        local vx = vertices[i]
+        local vy = vertices[i + 1]
+        worldVertices[i] = vx * a + vy * b + x
+        worldVertices[i + 1] = vx * c + vy * d + y
+    end
+  else
+    -- Weighted vertices
+    local w = 0
+    local v = 1
+    local b = 1
+
+    for i = 1, vertexCount * 2, 2 do
+      local wx = 0
+      local wy = 0
+      
+      local boneCount = bones[b]
+      local nn = b + boneCount
+      b = b + 1
+
+      for n = b, nn do
+        local boneIndex = bones[n]
+        local bone = skeleton.bones[boneIndex]
+        local vx = vertices[v]
+        local vy = vertices[v + 1]
+        local weight = weights[w + 1]
+
+        wx = wx + (vx * bone.a + vy * bone.b + bone.worldX) * weight
+        wy = wy + (vx * bone.c + vy * bone.d + bone.worldY) * weight
+
+        v = v + 2
+        w = w + 1
+      end
+      b = nn + 1
+
+      worldVertices[i] = wx
+      worldVertices[i + 1] = wy
+    end
   end
 end
 
@@ -653,12 +698,12 @@ function BoundingBoxAttachment:computeWorldVertices(slot, worldVertices)
   local weights = self.weights
 
   if #bones == 0 then
-    -- No bone weights
+    -- 无骨骼权重
     for i = 1, #vertices do
       worldVertices[i] = vertices[i]
     end
   else
-    -- Has bone weights
+    -- 有骨骼权重
     local w = 0
     local v = 1
     local b = 1
@@ -688,7 +733,7 @@ function BoundingBoxAttachment:computeWorldVertices(slot, worldVertices)
   end
 end
 
--- Skin data
+-- 皮肤数据
 local Skin = setmetatable({}, {__index = BaseData})
 Skin.__index = Skin
 
@@ -763,7 +808,7 @@ function Skin:clear()
   self.constraints = {}
 end
 
--- Event data
+-- 事件数据
 local EventData = setmetatable({}, {__index = BaseData})
 EventData.__index = EventData
 
@@ -882,7 +927,7 @@ function PhysicsConstraintData.new(name)
   return self
 end
 
--- Skeleton data
+-- 骨架数据
 local SkeletonData = setmetatable({}, {__index = BaseData})
 SkeletonData.__index = SkeletonData
 
@@ -908,7 +953,6 @@ function SkeletonData.new(jsonData, scale)
   self.imagesPath = nil
   self.audioPath = nil
   self.fps = 30
-  self.referenceScale = 100 * (scale or 1)
 
   if jsonData then
     self:loadFromJson(jsonData, nil)
@@ -918,7 +962,7 @@ function SkeletonData.new(jsonData, scale)
 end
 
 function SkeletonData:loadFromJson(json, attachmentLoader)
-  -- Parse skeleton metadata
+  -- 解析骨架元数据
   if json.skeleton then
     local skeleton = json.skeleton
     self.hash = skeleton.hash
@@ -928,12 +972,9 @@ function SkeletonData:loadFromJson(json, attachmentLoader)
     self.imagesPath = skeleton.images
     self.audioPath = skeleton.audio
     self.fps = skeleton.fps or 30
-    if skeleton.referenceScale then
-        self.referenceScale = skeleton.referenceScale * self.scale
-    end
   end
 
-  -- Parse bone data
+  -- 解析骨骼数据
   if json.bones then
     for _, boneJson in ipairs(json.bones) do
       local parent = nil
@@ -961,7 +1002,7 @@ function SkeletonData:loadFromJson(json, attachmentLoader)
     end
   end
 
-  -- Parse slot data
+  -- 解析插槽数据
   if json.slots then
     for _, slotJson in ipairs(json.slots) do
       local boneData = self:findBone(slotJson.bone)
@@ -1044,7 +1085,7 @@ function SkeletonData:loadFromJson(json, attachmentLoader)
   end
   end
 
-  -- Parse event data
+  -- 解析事件数据
   if json.events then
     for eventName, eventJson in pairs(json.events) do
       local eventData = EventData.new(eventName)
@@ -1184,7 +1225,7 @@ function SkeletonData:loadFromJson(json, attachmentLoader)
     end
   end
 
-  -- Parse animation data
+  -- 解析动画数据
   if json.animations then
     local animationModule = require("spine.animation")
 
@@ -1295,14 +1336,13 @@ function SkeletonData:loadFromJson(json, attachmentLoader)
             if boneTimelines.translatex then
               local frameCount = #boneTimelines.translatex
               if frameCount > 0 then
-                -- print("DEBUG: Creating TranslateXTimeline for bone " .. boneName .. " (" .. boneIndex .. ") with " .. frameCount .. " frames")
                 local timeline = animationModule.TranslateXTimeline.new(frameCount)
                 timeline.boneIndex = boneIndex
 
                 for i, frame in ipairs(boneTimelines.translatex) do
                   local time = frame.time or 0
-                  local value = (frame.value or 0) * self.scale
-                  timeline:setFrame(i - 1, time, value)
+                  local val = (frame.value or 0) * self.scale
+                  timeline:setFrame(i - 1, time, val)
 
                   if frame.curve then
                     if frame.curve == "stepped" then
@@ -1310,24 +1350,18 @@ function SkeletonData:loadFromJson(json, attachmentLoader)
                     elseif type(frame.curve) == "table" then
                       local nextFrame = boneTimelines.translatex[i+1]
                       if nextFrame then
-                        local frameDuration = nextFrame.time - time
-                        local valChange = (nextFrame.value or 0) * self.scale - value
-                        
-                        local c = frame.curve
-                        if #c == 4 then -- 2D curve for single dimension? Usually 4 for bezier
-                            local cx1 = (c[1] - time) / frameDuration
-                            local cy1 = (valChange == 0) and 0 or (c[2] * self.scale - value) / valChange
-                            local cx2 = (c[3] - time) / frameDuration
-                            local cy2 = (valChange == 0) and 0 or (c[4] * self.scale - value) / valChange
-                            timeline:setCurve(i - 1, cx1, cy1, cx2, cy2)
-                        else
-                            -- Handle simple curve params or other formats if needed
-                            -- For now assuming standard bezier or linear
-                        end
+                          local frameDuration = nextFrame.time - time
+                          local valChange = (nextFrame.value or 0) * self.scale - val
+                          
+                          local c = frame.curve
+                          local cx1 = (c[1] - time) / frameDuration
+                          local cy1 = (valChange == 0) and 0 or (c[2] * self.scale - val) / valChange
+                          local cx2 = (c[3] - time) / frameDuration
+                          local cy2 = (valChange == 0) and 0 or (c[4] * self.scale - val) / valChange
+                          timeline:setCurve(i - 1, cx1, cy1, cx2, cy2)
                       end
                     end
                   end
-
                   if time > duration then duration = time end
                 end
                 table.insert(timelines, timeline)
@@ -1343,8 +1377,8 @@ function SkeletonData:loadFromJson(json, attachmentLoader)
 
                 for i, frame in ipairs(boneTimelines.translatey) do
                   local time = frame.time or 0
-                  local value = (frame.value or 0) * self.scale
-                  timeline:setFrame(i - 1, time, value)
+                  local val = (frame.value or 0) * self.scale
+                  timeline:setFrame(i - 1, time, val)
 
                   if frame.curve then
                     if frame.curve == "stepped" then
@@ -1352,21 +1386,18 @@ function SkeletonData:loadFromJson(json, attachmentLoader)
                     elseif type(frame.curve) == "table" then
                       local nextFrame = boneTimelines.translatey[i+1]
                       if nextFrame then
-                        local frameDuration = nextFrame.time - time
-                        local valChange = (nextFrame.value or 0) * self.scale - value
-                        
-                        local c = frame.curve
-                        if #c == 4 then
-                            local cx1 = (c[1] - time) / frameDuration
-                            local cy1 = (valChange == 0) and 0 or (c[2] * self.scale - value) / valChange
-                            local cx2 = (c[3] - time) / frameDuration
-                            local cy2 = (valChange == 0) and 0 or (c[4] * self.scale - value) / valChange
-                            timeline:setCurve(i - 1, cx1, cy1, cx2, cy2)
-                        end
+                          local frameDuration = nextFrame.time - time
+                          local valChange = (nextFrame.value or 0) * self.scale - val
+                          
+                          local c = frame.curve
+                          local cx1 = (c[1] - time) / frameDuration
+                          local cy1 = (valChange == 0) and 0 or (c[2] * self.scale - val) / valChange
+                          local cx2 = (c[3] - time) / frameDuration
+                          local cy2 = (valChange == 0) and 0 or (c[4] * self.scale - val) / valChange
+                          timeline:setCurve(i - 1, cx1, cy1, cx2, cy2)
                       end
                     end
                   end
-
                   if time > duration then duration = time end
                 end
                 table.insert(timelines, timeline)
@@ -1423,6 +1454,78 @@ function SkeletonData:loadFromJson(json, attachmentLoader)
               end
             end
 
+            -- Parse scalex timeline
+            if boneTimelines.scalex then
+              local frameCount = #boneTimelines.scalex
+              if frameCount > 0 then
+                local timeline = animationModule.ScaleXTimeline.new(frameCount)
+                timeline.boneIndex = boneIndex
+
+                for i, frame in ipairs(boneTimelines.scalex) do
+                  local time = frame.time or 0
+                  local val = frame.value or 0
+                  timeline:setFrame(i - 1, time, val)
+
+                  if frame.curve then
+                    if frame.curve == "stepped" then
+                      timeline:setStepped(i - 1)
+                    elseif type(frame.curve) == "table" then
+                      local nextFrame = boneTimelines.scalex[i+1]
+                      if nextFrame then
+                          local frameDuration = nextFrame.time - time
+                          local valChange = (nextFrame.value or 0) - val
+                          
+                          local c = frame.curve
+                          local cx1 = (c[1] - time) / frameDuration
+                          local cy1 = (valChange == 0) and 0 or (c[2] - val) / valChange
+                          local cx2 = (c[3] - time) / frameDuration
+                          local cy2 = (valChange == 0) and 0 or (c[4] - val) / valChange
+                          timeline:setCurve(i - 1, cx1, cy1, cx2, cy2)
+                      end
+                    end
+                  end
+                  if time > duration then duration = time end
+                end
+                table.insert(timelines, timeline)
+              end
+            end
+
+            -- Parse scaley timeline
+            if boneTimelines.scaley then
+              local frameCount = #boneTimelines.scaley
+              if frameCount > 0 then
+                local timeline = animationModule.ScaleYTimeline.new(frameCount)
+                timeline.boneIndex = boneIndex
+
+                for i, frame in ipairs(boneTimelines.scaley) do
+                  local time = frame.time or 0
+                  local val = frame.value or 0
+                  timeline:setFrame(i - 1, time, val)
+
+                  if frame.curve then
+                    if frame.curve == "stepped" then
+                      timeline:setStepped(i - 1)
+                    elseif type(frame.curve) == "table" then
+                      local nextFrame = boneTimelines.scaley[i+1]
+                      if nextFrame then
+                          local frameDuration = nextFrame.time - time
+                          local valChange = (nextFrame.value or 0) - val
+                          
+                          local c = frame.curve
+                          local cx1 = (c[1] - time) / frameDuration
+                          local cy1 = (valChange == 0) and 0 or (c[2] - val) / valChange
+                          local cx2 = (c[3] - time) / frameDuration
+                          local cy2 = (valChange == 0) and 0 or (c[4] - val) / valChange
+                          timeline:setCurve(i - 1, cx1, cy1, cx2, cy2)
+                      end
+                    end
+                  end
+                  if time > duration then duration = time end
+                end
+                table.insert(timelines, timeline)
+              end
+            end
+
             -- Parse shear timeline
             if boneTimelines.shear then
               local frameCount = #boneTimelines.shear
@@ -1469,6 +1572,78 @@ function SkeletonData:loadFromJson(json, attachmentLoader)
                   if time > duration then duration = time end
                 end
 
+                table.insert(timelines, timeline)
+              end
+            end
+
+            -- Parse shearx timeline
+            if boneTimelines.shearx then
+              local frameCount = #boneTimelines.shearx
+              if frameCount > 0 then
+                local timeline = animationModule.ShearXTimeline.new(frameCount)
+                timeline.boneIndex = boneIndex
+
+                for i, frame in ipairs(boneTimelines.shearx) do
+                  local time = frame.time or 0
+                  local val = frame.value or 0
+                  timeline:setFrame(i - 1, time, val)
+
+                  if frame.curve then
+                    if frame.curve == "stepped" then
+                      timeline:setStepped(i - 1)
+                    elseif type(frame.curve) == "table" then
+                      local nextFrame = boneTimelines.shearx[i+1]
+                      if nextFrame then
+                          local frameDuration = nextFrame.time - time
+                          local valChange = (nextFrame.value or 0) - val
+                          
+                          local c = frame.curve
+                          local cx1 = (c[1] - time) / frameDuration
+                          local cy1 = (valChange == 0) and 0 or (c[2] - val) / valChange
+                          local cx2 = (c[3] - time) / frameDuration
+                          local cy2 = (valChange == 0) and 0 or (c[4] - val) / valChange
+                          timeline:setCurve(i - 1, cx1, cy1, cx2, cy2)
+                      end
+                    end
+                  end
+                  if time > duration then duration = time end
+                end
+                table.insert(timelines, timeline)
+              end
+            end
+
+            -- Parse sheary timeline
+            if boneTimelines.sheary then
+              local frameCount = #boneTimelines.sheary
+              if frameCount > 0 then
+                local timeline = animationModule.ShearYTimeline.new(frameCount)
+                timeline.boneIndex = boneIndex
+
+                for i, frame in ipairs(boneTimelines.sheary) do
+                  local time = frame.time or 0
+                  local val = frame.value or 0
+                  timeline:setFrame(i - 1, time, val)
+
+                  if frame.curve then
+                    if frame.curve == "stepped" then
+                      timeline:setStepped(i - 1)
+                    elseif type(frame.curve) == "table" then
+                      local nextFrame = boneTimelines.sheary[i+1]
+                      if nextFrame then
+                          local frameDuration = nextFrame.time - time
+                          local valChange = (nextFrame.value or 0) - val
+                          
+                          local c = frame.curve
+                          local cx1 = (c[1] - time) / frameDuration
+                          local cy1 = (valChange == 0) and 0 or (c[2] - val) / valChange
+                          local cx2 = (c[3] - time) / frameDuration
+                          local cy2 = (valChange == 0) and 0 or (c[4] - val) / valChange
+                          timeline:setCurve(i - 1, cx1, cy1, cx2, cy2)
+                      end
+                    end
+                  end
+                  if time > duration then duration = time end
+                end
                 table.insert(timelines, timeline)
               end
             end
@@ -1730,70 +1905,63 @@ function SkeletonData:loadFromJson(json, attachmentLoader)
           end
 
           if constraintIndex ~= -1 then
-             for typeName, timelineData in pairs(timelineMap) do
-                local timeline = nil
-                if typeName == "reset" then
-                   local frameCount = #timelineData
-                   if frameCount > 0 then
-                      -- print("DEBUG: Creating PhysicsConstraintResetTimeline for constraint " .. constraintName .. " (" .. constraintIndex .. ")")
-                      timeline = animationModule.PhysicsConstraintResetTimeline.new(frameCount)
-                      timeline.physicsConstraintIndex = constraintIndex
-                      for i, frame in ipairs(timelineData) do
+            for typeName, timelineData in pairs(timelineMap) do
+                local timelineType = nil
+                if typeName == "inertia" then timelineType = animationModule.PhysicsConstraintTimeline.INERTIA
+                elseif typeName == "strength" then timelineType = animationModule.PhysicsConstraintTimeline.STRENGTH
+                elseif typeName == "damping" then timelineType = animationModule.PhysicsConstraintTimeline.DAMPING
+                elseif typeName == "massInverse" then timelineType = animationModule.PhysicsConstraintTimeline.MASS_INVERSE
+                elseif typeName == "wind" then timelineType = animationModule.PhysicsConstraintTimeline.WIND
+                elseif typeName == "gravity" then timelineType = animationModule.PhysicsConstraintTimeline.GRAVITY
+                elseif typeName == "mix" then timelineType = animationModule.PhysicsConstraintTimeline.MIX
+                end
+
+                if timelineType then
+                    local frameCount = #timelineData
+                    local timeline = animationModule.PhysicsConstraintTimeline.new(frameCount, timelineType)
+                    timeline.physicsConstraintIndex = constraintIndex
+                    
+                    for i, frame in ipairs(timelineData) do
+                        local time = frame.time or 0
+                        local value = frame.value or 0
+                        timeline:setFrame(i - 1, time, value)
+                        
+                        if frame.curve then
+                            if frame.curve == "stepped" then
+                                timeline:setStepped(i - 1)
+                            elseif type(frame.curve) == "table" then
+                                local nextFrame = timelineData[i+1]
+                                if nextFrame then
+                                    local frameDuration = nextFrame.time - time
+                                    local valChange = (nextFrame.value or 0) - value
+                                    
+                                    local c = frame.curve
+                                    local cx1 = (c[1] - time) / frameDuration
+                                    local cy1 = (valChange == 0) and 0 or (c[2] - value) / valChange
+                                    local cx2 = (c[3] - time) / frameDuration
+                                    local cy2 = (valChange == 0) and 0 or (c[4] - value) / valChange
+                                    
+                                    timeline:setCurve(i - 1, cx1, cy1, cx2, cy2)
+                                end
+                            end
+                        end
+                        
+                        if time > duration then duration = time end
+                    end
+                    table.insert(timelines, timeline)
+                elseif typeName == "reset" then
+                     local frameCount = #timelineData
+                     local timeline = animationModule.PhysicsConstraintResetTimeline.new(frameCount)
+                     timeline.physicsConstraintIndex = constraintIndex
+                     
+                     for i, frame in ipairs(timelineData) do
                          local time = frame.time or 0
                          timeline:setFrame(i - 1, time)
                          if time > duration then duration = time end
-                      end
-                   end
-                else
-                   local type = -1
-                   if typeName == "inertia" then type = animationModule.PhysicsConstraintTimeline.INERTIA
-                   elseif typeName == "strength" then type = animationModule.PhysicsConstraintTimeline.STRENGTH
-                   elseif typeName == "damping" then type = animationModule.PhysicsConstraintTimeline.DAMPING
-                   elseif typeName == "massInverse" then type = animationModule.PhysicsConstraintTimeline.MASS_INVERSE
-                   elseif typeName == "wind" then type = animationModule.PhysicsConstraintTimeline.WIND
-                   elseif typeName == "gravity" then type = animationModule.PhysicsConstraintTimeline.GRAVITY
-                   elseif typeName == "mix" then type = animationModule.PhysicsConstraintTimeline.MIX
-                   end
-
-                   if type ~= -1 then
-                      local frameCount = #timelineData
-                      if frameCount > 0 then
-                         timeline = animationModule.PhysicsConstraintTimeline.new(frameCount, type)
-                         timeline.physicsConstraintIndex = constraintIndex
-                         for i, frame in ipairs(timelineData) do
-                            local time = frame.time or 0
-                            local value = frame.value or 0
-                            timeline:setFrame(i - 1, time, value)
-
-                            if frame.curve then
-                                if frame.curve == "stepped" then
-                                  timeline:setStepped(i - 1)
-                                elseif type(frame.curve) == "table" then
-                                  local nextFrame = timelineData[i+1]
-                                  if nextFrame then
-                                      local frameDuration = nextFrame.time - time
-                                      local valChange = (nextFrame.value or 0) - value
-                                      
-                                      local c = frame.curve
-                                      local cx1 = (c[1] - time) / frameDuration
-                                      local cy1 = (valChange == 0) and 0 or (c[2] - value) / valChange
-                                      local cx2 = (c[3] - time) / frameDuration
-                                      local cy2 = (valChange == 0) and 0 or (c[4] - value) / valChange
-                                      timeline:setCurve(i - 1, cx1, cy1, cx2, cy2)
-                                  end
-                                end
-                            end
-
-                            if time > duration then duration = time end
-                         end
-                      end
-                   end
+                     end
+                     table.insert(timelines, timeline)
                 end
-
-                if timeline then
-                   table.insert(timelines, timeline)
-                end
-             end
+            end
           end
         end
       end
@@ -2239,7 +2407,7 @@ function SkeletonData:createAttachment(attachmentMap, attachmentName, attachment
       attachment.color:fromHex(attachmentMap.color)
     end
 
-    -- Vertex data should be parsed here
+    -- 这里应该解析顶点数据
     return attachment
   elseif attachmentType == "linkedmesh" then
     local path = attachmentMap.path or attachmentMap.name or attachmentName
@@ -2284,8 +2452,56 @@ function SkeletonData:createAttachment(attachmentMap, attachmentName, attachment
 
     -- Parse vertices
     if attachmentMap.vertices then
-        attachment.vertices = attachmentMap.vertices
-        attachment.vertexCount = #attachmentMap.vertices
+        local jsonVertices = attachmentMap.vertices
+        local vertexCount = attachmentMap.vertexCount or 0
+        attachment.worldVerticesLength = vertexCount * 2
+        attachment.vertexCount = vertexCount
+        
+        -- Logic to detect weighted vs non-weighted
+        local isWeighted = #jsonVertices > vertexCount * 2
+        
+        if not isWeighted then
+            -- Non-weighted
+            attachment.vertices = {}
+            for i, v in ipairs(jsonVertices) do
+                attachment.vertices[i] = v * self.scale
+            end
+        else
+            -- Weighted
+            attachment.vertices = {}
+            attachment.bones = {}
+            attachment.weights = {}
+            
+            local v = 1
+            local b = 1
+            local w = 1
+            local i = 1
+            
+            while i <= #jsonVertices do
+                local boneCount = jsonVertices[i]
+                attachment.bones[b] = boneCount
+                b = b + 1
+                i = i + 1
+                
+                for _ = 1, boneCount do
+                    -- Bone index (JSON is 0-based, Lua is 1-based)
+                    attachment.bones[b] = jsonVertices[i] + 1
+                    b = b + 1
+                    i = i + 1
+                    
+                    -- Vertex x, y
+                    attachment.vertices[v] = jsonVertices[i] * self.scale
+                    attachment.vertices[v+1] = jsonVertices[i+1] * self.scale
+                    v = v + 2
+                    i = i + 2
+                    
+                    -- Weight
+                    attachment.weights[w] = jsonVertices[i]
+                    w = w + 1
+                    i = i + 1
+                end
+            end
+        end
     end
 
     return attachment
@@ -2377,7 +2593,7 @@ function AnimationStateData:setDefaultMix(duration)
   self.defaultMix = duration or self.defaultMix
 end
 
--- Export data module
+-- 导出数据模块
 data.BaseData = BaseData
 data.BoneData = BoneData
 data.SlotData = SlotData
@@ -2394,5 +2610,6 @@ data.AnimationStateData = AnimationStateData
 data.IkConstraintData = IkConstraintData
 data.TransformConstraintData = TransformConstraintData
 data.PathConstraintData = PathConstraintData
+data.PhysicsConstraintData = PhysicsConstraintData
 
 return data

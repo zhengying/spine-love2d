@@ -158,8 +158,8 @@ function spine.update(instance, deltaTime)
     instance.animationState:apply(instance.skeleton)
   end
   
-  -- Update skeleton time (required for physics)
-  instance.skeleton:update(deltaTime)
+  -- -- Update skeleton time (required for physics)
+  -- instance.skeleton:update(deltaTime)
   
   -- Update skeleton world transforms
   instance.skeleton:updateWorldTransform()

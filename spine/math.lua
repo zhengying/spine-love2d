@@ -1,6 +1,9 @@
--- Spine Love2D Runtime 
+-- Spine Love2D Runtime - 数学库模块
+-- 提供向量、矩阵、变换等数学计算功能
+
 local math_module = {}
 
+-- 向量2D
 local Vector2 = {}
 Vector2.__index = Vector2
 
@@ -103,6 +106,7 @@ end
 
 math_module.Vector2 = Vector2
 
+-- 变换矩阵
 local Transform = {}
 Transform.__index = Transform
 
@@ -212,7 +216,7 @@ end
 
 math_module.Transform = Transform
 
--- Color utilities
+-- 颜色工具
 local Color = {}
 Color.__index = Color
 
@@ -277,7 +281,7 @@ end
 
 math_module.Color = Color
 
--- Interpolation functions
+-- 插值函数
 function math_module.lerp(a, b, t)
   return a + (b - a) * t
 end
@@ -340,14 +344,18 @@ function math_module.bezier(t, p0, p1, p2, p3)
   local ttt = tt * t
   
   if p3 then
+    -- 三次贝塞尔
     return uuu * p0 + 3 * uu * t * p1 + 3 * u * tt * p2 + ttt * p3
   elseif p2 then
+    -- 二次贝塞尔
     return uu * p0 + 2 * u * t * p1 + tt * p2
   else
+    -- 线性
     return u * p0 + t * p1
   end
 end
 
+-- 曲线计算
 function math_module.curve(t, cx1, cy1, cx2, cy2)
   local u = 1 - t
   local tt = t * t
@@ -355,23 +363,29 @@ function math_module.curve(t, cx1, cy1, cx2, cy2)
   local uuu = uu * u
   local ttt = tt * t
   
+  -- 三次贝塞尔曲线
   local x = uuu * 0 + 3 * uu * t * cx1 + 3 * u * tt * cx2 + ttt * 1
   local y = uuu * 0 + 3 * uu * t * cy1 + 3 * u * tt * cy2 + ttt * 1
   
   return x, y
 end
 
+-- 初始化数学库
 function math_module.init()
+  -- 设置随机数种子
   math.randomseed(os.time())
   
+  -- 扩展数学函数
   local originalMath = math
   
+  -- 度转弧度
   if not originalMath.rad then
     originalMath.rad = function(deg)
       return deg * math.pi / 180
     end
   end
   
+  -- 弧度转度
   if not originalMath.deg then
     originalMath.deg = function(rad)
       return rad * 180 / math.pi
@@ -381,6 +395,7 @@ function math_module.init()
   print("Spine Math module initialized")
 end
 
+-- 工具函数
 function math_module.isPowerOfTwo(n)
   return n > 0 and bit.band(n, n - 1) == 0
 end
@@ -394,6 +409,7 @@ function math_module.sign(n)
   return n > 0 and 1 or (n < 0 and -1 or 0)
 end
 
+-- 矩阵运算 (简化版，主要用于2D变换)
 local Matrix = {}
 Matrix.__index = Matrix
 

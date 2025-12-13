@@ -8,7 +8,7 @@ local spine = require("spine-love2d")
 -- Configuration: Change these to load different Spine characters
 local CONFIG = {
     -- Current asset to load (options: "spineboy", "coin", "windmill", "mix_and_match")
-    currentAsset = "mix_and_match",
+    currentAsset = "cloud_pot",
     
     -- Asset paths
     assets = {

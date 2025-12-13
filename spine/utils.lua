@@ -1,9 +1,9 @@
--- Spine Love2D Runtime - Utilities module
--- Provides JSON parsing, string handling, table utilities, etc.
+-- Spine Love2D Runtime - 工具函数模块
+-- 提供JSON解析、字符串处理、表操作等实用工具
 
 local utils = {}
 
--- JSON parser (simplified)
+-- JSON解析器 (简化版)
 local function parseJson(str)
   local pos = 1
   local len = #str
@@ -43,7 +43,7 @@ local function parseJson(str)
   end
 
   parseString = function()
-    pos = pos + 1 -- Skip opening quote
+    pos = pos + 1 -- 跳过开始引号
     local start = pos
     local result = {}
 
@@ -90,11 +90,11 @@ local function parseJson(str)
       end
     end
 
-    return nil -- Unclosed string
+    return nil -- 未闭合的字符串
   end
 
   parseObject = function()
-    pos = pos + 1 -- Skip {
+    pos = pos + 1 -- 跳过 {
     local result = {}
 
     skipWhitespace()
@@ -122,7 +122,7 @@ local function parseJson(str)
         return nil
       end
 
-      pos = pos + 1 -- Skip :
+      pos = pos + 1 -- 跳过 :
 
       local value = parseValue()
       result[key] = value
@@ -150,7 +150,7 @@ local function parseJson(str)
   end
 
   parseArray = function()
-    pos = pos + 1 -- Skip [
+    pos = pos + 1 -- 跳过 [
     local result = {}
 
     skipWhitespace()
@@ -198,12 +198,12 @@ local function parseJson(str)
   parseNumber = function()
     local start = pos
 
-    -- Handle minus sign
+    -- 处理负号
     if pos <= len and str:sub(pos, pos) == '-' then
       pos = pos + 1
     end
 
-    -- Handle integer part
+    -- 处理整数部分
     if pos > len or not str:match("^%d", pos) then
       return nil
     end
@@ -212,7 +212,7 @@ local function parseJson(str)
       pos = pos + 1
     end
 
-    -- Handle fractional part
+    -- 处理小数部分
     if pos <= len and str:sub(pos, pos) == '.' then
       pos = pos + 1
 
@@ -225,7 +225,7 @@ local function parseJson(str)
       end
     end
 
-    -- Handle exponent part
+    -- 处理指数部分
     if pos <= len and (str:sub(pos, pos) == 'e' or str:sub(pos, pos) == 'E') then
       pos = pos + 1
 
@@ -280,7 +280,7 @@ local function parseJson(str)
   return result
 end
 
--- JSON decode
+-- JSON解码
 function utils.jsonDecode(str)
   if type(str) ~= "string" then
     return nil, "Input must be a string"
@@ -294,7 +294,7 @@ function utils.jsonDecode(str)
   return result
 end
 
--- JSON encode (simplified)
+-- JSON编码 (简化版)
 function utils.jsonEncode(obj, pretty)
   pretty = pretty or false
   local indent = pretty and "  " or ""
@@ -309,18 +309,18 @@ function utils.jsonEncode(obj, pretty)
     elseif t == "boolean" then
       return tostring(value)
     elseif t == "number" then
-      -- Handle infinity and NaN
+      -- 处理无穷大和NaN
       if value ~= value then
         return "null" -- NaN
       elseif value == math.huge then
-        return "null" -- Positive infinity
+        return "null" -- 正无穷
       elseif value == -math.huge then
-        return "null" -- Negative infinity
+        return "null" -- 负无穷
       else
         return tostring(value)
       end
     elseif t == "string" then
-      -- Escape string
+      -- 转义字符串
       return '"' .. value:gsub('(["\\%c])', function(c)
         if c == '"' then return '\\"'
         elseif c == '\\' then return '\\\\'
@@ -334,7 +334,7 @@ function utils.jsonEncode(obj, pretty)
         end
       end) .. '"'
     elseif t == "table" then
-      -- Check if array
+      -- 检查是否为数组
       local isArray = true
       local count = 0
       for k, _ in pairs(value) do
@@ -346,7 +346,7 @@ function utils.jsonEncode(obj, pretty)
       end
 
       if isArray and count > 0 then
-        -- Array
+        -- 数组
         local parts = {}
         for i = 1, count do
           table.insert(parts, encodeValue(value[i], level + 1))
@@ -362,7 +362,7 @@ function utils.jsonEncode(obj, pretty)
           return "[" .. table.concat(parts, ",") .. "]"
         end
       else
-        -- Object
+        -- 对象
         local parts = {}
         for k, v in pairs(value) do
           table.insert(parts, encodeValue(tostring(k), level + 1) .. ":" ..
@@ -387,7 +387,7 @@ function utils.jsonEncode(obj, pretty)
   return encodeValue(obj)
 end
 
--- Color utilities
+-- 颜色工具函数
 function utils.hexToColor(hex)
   if not hex or #hex < 6 then return 1, 1, 1, 1 end
 
@@ -403,7 +403,7 @@ function utils.hexToColor(hex)
   return r, g, b, a
 end
 
--- String utilities
+-- 字符串工具函数
 function utils.split(str, delimiter)
   local result = {}
   local pattern = "(.-)" .. delimiter
@@ -440,7 +440,7 @@ function utils.replace(str, old, new)
   return str:gsub(old, new)
 end
 
--- Table utilities
+-- 表操作工具函数
 function utils.shallowCopy(t)
   local copy = {}
   for k, v in pairs(t) do
@@ -536,7 +536,7 @@ function utils.clear(t)
   end
 end
 
--- File path utilities
+-- 文件路径工具函数
 function utils.getFileName(path)
   return path:match("([^/\\]+)$")
 end
@@ -554,13 +554,13 @@ end
 function utils.joinPath(...)
   local parts = {...}
   local result = table.concat(parts, "/")
-  -- Normalize path
+  -- 规范化路径
   result = result:gsub("/+", "/")
   result = result:gsub("/$", "")
   return result
 end
 
--- Performance profiling utilities
+-- 性能分析工具函数
 utils.Profiler = {}
 utils.Profiler.__index = utils.Profiler
 
@@ -612,7 +612,7 @@ function utils.Profiler:reset()
   self.isRunning = false
 end
 
--- Cache utilities
+-- 缓存工具函数
 utils.Cache = {}
 utils.Cache.__index = utils.Cache
 
@@ -627,7 +627,7 @@ end
 function utils.Cache:get(key)
   local value = self.data[key]
   if value ~= nil then
-    -- Update access order (LRU)
+    -- 更新访问顺序 (LRU)
     for i, k in ipairs(self.accessOrder) do
       if k == key then
         table.remove(self.accessOrder, i)
@@ -642,7 +642,7 @@ end
 
 function utils.Cache:set(key, value)
   if self.data[key] == nil and #self.accessOrder >= self.maxSize then
-    -- Remove least recently used item
+    -- 移除最久未使用的项
     local oldestKey = table.remove(self.accessOrder, 1)
     self.data[oldestKey] = nil
   end
@@ -663,7 +663,7 @@ function utils.Cache:getSize()
   return #self.accessOrder
 end
 
--- Logging utilities
+-- 日志工具函数
 utils.log = function(level, message, ...)
   local levels = {DEBUG = 1, INFO = 2, WARN = 3, ERROR = 4}
   local currentLevel = levels[utils.logLevel] or levels.INFO
@@ -678,7 +678,7 @@ end
 
 utils.logLevel = "INFO"
 
--- Simplified logging functions
+-- 简化的日志函数
 utils.debug = function(...) utils.log("DEBUG", ...) end
 utils.info = function(...) utils.log("INFO", ...) end
 utils.warn = function(...) utils.log("WARN", ...) end

@@ -270,10 +270,6 @@ function Skeleton.new(skeletonData)
             end
         end
         local bone = Bone.new(boneData, parent, self)
-        if parent then
-             if not parent.children then parent.children = {} end
-             table.insert(parent.children, bone)
-        end
         table.insert(self.bones, bone)
     end
     
@@ -304,7 +300,7 @@ function Skeleton.new(skeletonData)
         table.insert(self.pathConstraints, pathConstraint)
         table.insert(self.constraints, pathConstraint)
     end
-    
+
     for i, physicsConstraintData in ipairs(skeletonData.physicsConstraints) do
         local physicsConstraint = constraintModule.PhysicsConstraint.new(physicsConstraintData, self)
         table.insert(self.physicsConstraints, physicsConstraint)
@@ -339,6 +335,28 @@ function Skeleton:updateWorldTransform()
     -- 2. Apply Constraints (IK, Transform, Path) in order
     for _, constraint in ipairs(self.constraints) do
         constraint:apply()
+        
+        -- Update children of constrained bones
+        -- This ensures that bones not affected by the constraint but attached to constrained bones
+        -- follow their parents correctly.
+        if constraint.bones then
+            for _, bone in ipairs(constraint.bones) do
+                for _, child in ipairs(bone.children) do
+                    -- Check if child is also constrained by THIS constraint
+                    local isChildConstrained = false
+                    for _, cb in ipairs(constraint.bones) do
+                        if cb == child then
+                            isChildConstrained = true
+                            break
+                        end
+                    end
+                    
+                    if not isChildConstrained then
+                        child:updateWorldTransform()
+                    end
+                end
+            end
+        end
     end
 end
 

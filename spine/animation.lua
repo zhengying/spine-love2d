@@ -1124,9 +1124,10 @@ function IkConstraintTimeline:setFrame(frameIndex, time, mix, bendDirection, com
 end
 
 function IkConstraintTimeline:apply(skeleton, lastTime, time, events, alpha, blend, direction)
-    local frames = self.frames
     local constraint = skeleton.ikConstraints[self.ikConstraintIndex]
     if not constraint then return end
+    
+    local frames = self.frames
 
     if time < frames[1] then
         if blend == "setup" then
@@ -1362,119 +1363,6 @@ function PathConstraintTimeline:apply(skeleton, lastTime, time, events, alpha, b
     end
 end
 
--- Timeline for X-only translation (TranslateXTimeline)
-local TranslateXTimeline = {}
-TranslateXTimeline.__index = TranslateXTimeline
-setmetatable(TranslateXTimeline, {__index = CurveTimeline})
-
-function TranslateXTimeline.new(frameCount)
-    local self = setmetatable(CurveTimeline.new(frameCount), TranslateXTimeline)
-    return self
-end
-
-function TranslateXTimeline:getFrameEntries()
-    return 2
-end
-
-function TranslateXTimeline:setFrame(frameIndex, time, value)
-    frameIndex = frameIndex * 2
-    self.frames[frameIndex + 1] = time
-    self.frames[frameIndex + 2] = value
-end
-
-function TranslateXTimeline:apply(skeleton, lastTime, time, events, alpha, blend, direction)
-    local frames = self.frames
-    local bone = skeleton.bones[self.boneIndex]
-    if not bone then 
-        return 
-    end
-
-    if time < frames[1] then
-        if blend == "setup" then
-            bone.x = bone.data.x
-        end
-        return
-    end
-
-    local x = 0
-    if time >= frames[#frames - 1] then
-        x = frames[#frames]
-    else
-        local frameIndex = mathModule.binarySearch(frames, time, 2)
-        local time1 = frames[frameIndex]
-        local value1 = frames[frameIndex + 1]
-        local time2 = frames[frameIndex + 2]
-        local value2 = frames[frameIndex + 3]
-        local percent = self:getCurvePercent((frameIndex - 1) / 2, 1 - (time - time2) / (time1 - time2))
-        
-        x = value1 + (value2 - value1) * percent
-    end
-
-    -- print("DEBUG: TranslateXTimeline apply bone " .. bone.data.name .. " x=" .. x .. " alpha=" .. alpha)
-    if bone.data.name == "pot-control" then
-         print("DEBUG: TranslateXTimeline apply pot-control x=" .. x .. " time=" .. time)
-    end
-
-    if blend == "setup" then
-        bone.x = bone.data.x + x * alpha
-    else
-        bone.x = bone.x + (bone.data.x + x - bone.x) * alpha
-    end
-end
-
--- Timeline for Y-only translation (TranslateYTimeline)
-local TranslateYTimeline = {}
-TranslateYTimeline.__index = TranslateYTimeline
-setmetatable(TranslateYTimeline, {__index = CurveTimeline})
-
-function TranslateYTimeline.new(frameCount)
-    local self = setmetatable(CurveTimeline.new(frameCount), TranslateYTimeline)
-    return self
-end
-
-function TranslateYTimeline:getFrameEntries()
-    return 2
-end
-
-function TranslateYTimeline:setFrame(frameIndex, time, value)
-    frameIndex = frameIndex * 2
-    self.frames[frameIndex + 1] = time
-    self.frames[frameIndex + 2] = value
-end
-
-function TranslateYTimeline:apply(skeleton, lastTime, time, events, alpha, blend, direction)
-    local frames = self.frames
-    local bone = skeleton.bones[self.boneIndex]
-    if not bone then return end
-
-    if time < frames[1] then
-        if blend == "setup" then
-            bone.y = bone.data.y
-        end
-        return
-    end
-
-    local y = 0
-    if time >= frames[#frames - 1] then
-        y = frames[#frames]
-    else
-        local frameIndex = mathModule.binarySearch(frames, time, 2)
-        local time1 = frames[frameIndex]
-        local value1 = frames[frameIndex + 1]
-        local time2 = frames[frameIndex + 2]
-        local value2 = frames[frameIndex + 3]
-        local percent = self:getCurvePercent((frameIndex - 1) / 2, 1 - (time - time2) / (time1 - time2))
-        
-        y = value1 + (value2 - value1) * percent
-    end
-
-    if blend == "setup" then
-        bone.y = bone.data.y + y * alpha
-    else
-        bone.y = bone.y + (bone.data.y + y - bone.y) * alpha
-    end
-end
-
 -- PhysicsConstraintTimeline
 local PhysicsConstraintTimeline = {}
 PhysicsConstraintTimeline.__index = PhysicsConstraintTimeline
@@ -1612,7 +1500,60 @@ function PhysicsConstraintResetTimeline:apply(skeleton, lastTime, time, events, 
     end
 end
 
--- Timeline for Y-only translation (TranslateYTimeline)
+-- TranslateXTimeline
+local TranslateXTimeline = {}
+TranslateXTimeline.__index = TranslateXTimeline
+setmetatable(TranslateXTimeline, {__index = CurveTimeline})
+
+function TranslateXTimeline.new(frameCount)
+    local self = setmetatable(CurveTimeline.new(frameCount), TranslateXTimeline)
+    return self
+end
+
+function TranslateXTimeline:getFrameEntries()
+    return 2
+end
+
+function TranslateXTimeline:setFrame(frameIndex, time, x)
+    local i = frameIndex * 2 + 1
+    self.frames[i] = time
+    self.frames[i + 1] = x
+end
+
+function TranslateXTimeline:apply(skeleton, lastTime, time, events, alpha, blend, direction)
+    local frames = self.frames
+    local bone = skeleton.bones[self.boneIndex]
+
+    if time < frames[1] then
+        if blend == "setup" then
+            bone.x = bone.data.x
+        end
+        return
+    end
+
+    local x = 0
+
+    if time >= frames[#frames - 1] then
+        x = frames[#frames]
+    else
+        local frameIndex = mathModule.binarySearch(frames, time, 2)
+        local before = frames[frameIndex]
+        local x1 = frames[frameIndex + 1]
+        local after = frames[frameIndex + 2]
+        local x2 = frames[frameIndex + 3]
+        local percent = self:getCurvePercent((frameIndex - 1) / 2, 1 - (time - after) / (before - after))
+
+        x = x1 + (x2 - x1) * percent
+    end
+
+    if blend == "setup" then
+        bone.x = bone.data.x + x * alpha
+    else
+        bone.x = bone.x + (bone.data.x + x - bone.x) * alpha
+    end
+end
+
+-- TranslateYTimeline
 local TranslateYTimeline = {}
 TranslateYTimeline.__index = TranslateYTimeline
 setmetatable(TranslateYTimeline, {__index = CurveTimeline})
@@ -1626,16 +1567,15 @@ function TranslateYTimeline:getFrameEntries()
     return 2
 end
 
-function TranslateYTimeline:setFrame(frameIndex, time, value)
-    frameIndex = frameIndex * 2
-    self.frames[frameIndex + 1] = time
-    self.frames[frameIndex + 2] = value
+function TranslateYTimeline:setFrame(frameIndex, time, y)
+    local i = frameIndex * 2 + 1
+    self.frames[i] = time
+    self.frames[i + 1] = y
 end
 
 function TranslateYTimeline:apply(skeleton, lastTime, time, events, alpha, blend, direction)
     local frames = self.frames
     local bone = skeleton.bones[self.boneIndex]
-    if not bone then return end
 
     if time < frames[1] then
         if blend == "setup" then
@@ -1645,23 +1585,266 @@ function TranslateYTimeline:apply(skeleton, lastTime, time, events, alpha, blend
     end
 
     local y = 0
+
     if time >= frames[#frames - 1] then
         y = frames[#frames]
     else
         local frameIndex = mathModule.binarySearch(frames, time, 2)
-        local time1 = frames[frameIndex]
-        local value1 = frames[frameIndex + 1]
-        local time2 = frames[frameIndex + 2]
-        local value2 = frames[frameIndex + 3]
-        local percent = self:getCurvePercent((frameIndex - 1) / 2, 1 - (time - time2) / (time1 - time2))
-        
-        y = value1 + (value2 - value1) * percent
+        local before = frames[frameIndex]
+        local y1 = frames[frameIndex + 1]
+        local after = frames[frameIndex + 2]
+        local y2 = frames[frameIndex + 3]
+        local percent = self:getCurvePercent((frameIndex - 1) / 2, 1 - (time - after) / (before - after))
+
+        y = y1 + (y2 - y1) * percent
     end
 
     if blend == "setup" then
         bone.y = bone.data.y + y * alpha
     else
         bone.y = bone.y + (bone.data.y + y - bone.y) * alpha
+    end
+end
+
+-- ScaleXTimeline
+local ScaleXTimeline = {}
+ScaleXTimeline.__index = ScaleXTimeline
+setmetatable(ScaleXTimeline, {__index = CurveTimeline})
+
+function ScaleXTimeline.new(frameCount)
+    local self = setmetatable(CurveTimeline.new(frameCount), ScaleXTimeline)
+    return self
+end
+
+function ScaleXTimeline:getFrameEntries()
+    return 2
+end
+
+function ScaleXTimeline:setFrame(frameIndex, time, x)
+    local i = frameIndex * 2 + 1
+    self.frames[i] = time
+    self.frames[i + 1] = x
+end
+
+function ScaleXTimeline:apply(skeleton, lastTime, time, events, alpha, blend, direction)
+    local frames = self.frames
+    local bone = skeleton.bones[self.boneIndex]
+
+    if time < frames[1] then
+        if blend == "setup" then
+            bone.scaleX = bone.data.scaleX
+        end
+        return
+    end
+
+    local x = 0
+
+    if time >= frames[#frames - 1] then
+        x = frames[#frames] * bone.data.scaleX
+    else
+        local frameIndex = mathModule.binarySearch(frames, time, 2)
+        local before = frames[frameIndex]
+        local x1 = frames[frameIndex + 1]
+        local after = frames[frameIndex + 2]
+        local x2 = frames[frameIndex + 3]
+        local percent = self:getCurvePercent((frameIndex - 1) / 2, 1 - (time - after) / (before - after))
+
+        x = (x1 + (x2 - x1) * percent) * bone.data.scaleX
+    end
+
+    if alpha == 1 then
+        if blend == "add" then
+            bone.scaleX = bone.scaleX + x - bone.data.scaleX
+        else
+            bone.scaleX = x
+        end
+    else
+        local bx = 0
+        if blend == "setup" then
+            bx = bone.data.scaleX
+        else
+            bx = bone.scaleX
+        end
+
+        if blend == "setup" then
+            bone.scaleX = bx + (x - bx) * alpha
+        else
+            bone.scaleX = bx + (x - bx) * alpha
+        end
+    end
+end
+
+-- ScaleYTimeline
+local ScaleYTimeline = {}
+ScaleYTimeline.__index = ScaleYTimeline
+setmetatable(ScaleYTimeline, {__index = CurveTimeline})
+
+function ScaleYTimeline.new(frameCount)
+    local self = setmetatable(CurveTimeline.new(frameCount), ScaleYTimeline)
+    return self
+end
+
+function ScaleYTimeline:getFrameEntries()
+    return 2
+end
+
+function ScaleYTimeline:setFrame(frameIndex, time, y)
+    local i = frameIndex * 2 + 1
+    self.frames[i] = time
+    self.frames[i + 1] = y
+end
+
+function ScaleYTimeline:apply(skeleton, lastTime, time, events, alpha, blend, direction)
+    local frames = self.frames
+    local bone = skeleton.bones[self.boneIndex]
+
+    if time < frames[1] then
+        if blend == "setup" then
+            bone.scaleY = bone.data.scaleY
+        end
+        return
+    end
+
+    local y = 0
+
+    if time >= frames[#frames - 1] then
+        y = frames[#frames] * bone.data.scaleY
+    else
+        local frameIndex = mathModule.binarySearch(frames, time, 2)
+        local before = frames[frameIndex]
+        local y1 = frames[frameIndex + 1]
+        local after = frames[frameIndex + 2]
+        local y2 = frames[frameIndex + 3]
+        local percent = self:getCurvePercent((frameIndex - 1) / 2, 1 - (time - after) / (before - after))
+
+        y = (y1 + (y2 - y1) * percent) * bone.data.scaleY
+    end
+
+    if alpha == 1 then
+        if blend == "add" then
+            bone.scaleY = bone.scaleY + y - bone.data.scaleY
+        else
+            bone.scaleY = y
+        end
+    else
+        local by = 0
+        if blend == "setup" then
+            by = bone.data.scaleY
+        else
+            by = bone.scaleY
+        end
+
+        if blend == "setup" then
+            bone.scaleY = by + (y - by) * alpha
+        else
+            bone.scaleY = by + (y - by) * alpha
+        end
+    end
+end
+
+-- ShearXTimeline
+local ShearXTimeline = {}
+ShearXTimeline.__index = ShearXTimeline
+setmetatable(ShearXTimeline, {__index = CurveTimeline})
+
+function ShearXTimeline.new(frameCount)
+    local self = setmetatable(CurveTimeline.new(frameCount), ShearXTimeline)
+    return self
+end
+
+function ShearXTimeline:getFrameEntries()
+    return 2
+end
+
+function ShearXTimeline:setFrame(frameIndex, time, x)
+    local i = frameIndex * 2 + 1
+    self.frames[i] = time
+    self.frames[i + 1] = x
+end
+
+function ShearXTimeline:apply(skeleton, lastTime, time, events, alpha, blend, direction)
+    local frames = self.frames
+    local bone = skeleton.bones[self.boneIndex]
+
+    if time < frames[1] then
+        if blend == "setup" then
+            bone.shearX = bone.data.shearX
+        end
+        return
+    end
+
+    local x = 0
+
+    if time >= frames[#frames - 1] then
+        x = frames[#frames]
+    else
+        local frameIndex = mathModule.binarySearch(frames, time, 2)
+        local before = frames[frameIndex]
+        local x1 = frames[frameIndex + 1]
+        local after = frames[frameIndex + 2]
+        local x2 = frames[frameIndex + 3]
+        local percent = self:getCurvePercent((frameIndex - 1) / 2, 1 - (time - after) / (before - after))
+
+        x = x1 + (x2 - x1) * percent
+    end
+
+    if blend == "setup" then
+        bone.shearX = bone.data.shearX + x * alpha
+    else
+        bone.shearX = bone.shearX + (bone.data.shearX + x - bone.shearX) * alpha
+    end
+end
+
+-- ShearYTimeline
+local ShearYTimeline = {}
+ShearYTimeline.__index = ShearYTimeline
+setmetatable(ShearYTimeline, {__index = CurveTimeline})
+
+function ShearYTimeline.new(frameCount)
+    local self = setmetatable(CurveTimeline.new(frameCount), ShearYTimeline)
+    return self
+end
+
+function ShearYTimeline:getFrameEntries()
+    return 2
+end
+
+function ShearYTimeline:setFrame(frameIndex, time, y)
+    local i = frameIndex * 2 + 1
+    self.frames[i] = time
+    self.frames[i + 1] = y
+end
+
+function ShearYTimeline:apply(skeleton, lastTime, time, events, alpha, blend, direction)
+    local frames = self.frames
+    local bone = skeleton.bones[self.boneIndex]
+
+    if time < frames[1] then
+        if blend == "setup" then
+            bone.shearY = bone.data.shearY
+        end
+        return
+    end
+
+    local y = 0
+
+    if time >= frames[#frames - 1] then
+        y = frames[#frames]
+    else
+        local frameIndex = mathModule.binarySearch(frames, time, 2)
+        local before = frames[frameIndex]
+        local y1 = frames[frameIndex + 1]
+        local after = frames[frameIndex + 2]
+        local y2 = frames[frameIndex + 3]
+        local percent = self:getCurvePercent((frameIndex - 1) / 2, 1 - (time - after) / (before - after))
+
+        y = y1 + (y2 - y1) * percent
+    end
+
+    if blend == "setup" then
+        bone.shearY = bone.data.shearY + y * alpha
+    else
+        bone.shearY = bone.shearY + (bone.data.shearY + y - bone.shearY) * alpha
     end
 end
 
@@ -1675,7 +1858,11 @@ local animationModule = {
     TranslateXTimeline = TranslateXTimeline,
     TranslateYTimeline = TranslateYTimeline,
     ScaleTimeline = ScaleTimeline,
+    ScaleXTimeline = ScaleXTimeline,
+    ScaleYTimeline = ScaleYTimeline,
     ShearTimeline = ShearTimeline,
+    ShearXTimeline = ShearXTimeline,
+    ShearYTimeline = ShearYTimeline,
     ColorTimeline = ColorTimeline,
     TwoColorTimeline = TwoColorTimeline,
     AttachmentTimeline = AttachmentTimeline,
