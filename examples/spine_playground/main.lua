@@ -8,7 +8,7 @@ local spine = require("spine-love2d")
 -- Configuration: Change these to load different Spine characters
 local CONFIG = {
     -- Current asset to load (options: "spineboy", "coin", "windmill", "mix_and_match")
-    currentAsset = "powerup",
+    currentAsset = "spineboy_pro",
     
     -- Asset paths
     assets = {
@@ -63,7 +63,7 @@ local CONFIG = {
             y = 400
         },
         windmill = {
-            atlas = "assets/windmill/windmill-pma.atlas",
+            atlas = "assets/windmill/windmill.atlas",
             json = "assets/windmill/windmill-ess.json",
             scale = 0.5,
             x = 500,
@@ -100,7 +100,6 @@ local CONFIG = {
     }
 }
 
--- Demo state
 local playground = {
     skeleton = nil,
     animationState = nil,
@@ -112,11 +111,13 @@ local playground = {
     animations = {},
     currentAnimation = nil,
     currentAnimationIndex = 1,
+    assetNames = {},
+    currentAssetIndex = 1,
     
-    -- UI state
     showDebug = false,
     showHelp = true,
     loadError = nil,
+    showHud = true,
     
     -- Performance tracking
     fps = 0,
@@ -129,17 +130,22 @@ local playground = {
     scale = 0.5,
     
     -- UI layout
-    animationListWidth = 250,
-    animationListX = 10,
+    assetListWidth = 200,
+    assetListX = 10,
+    assetListY = 10,
+    assetItemHeight = 26,
+    assetScrollOffset = 0,
+    assetMaxVisibleItems = 12,
+    animationListWidth = 260,
+    animationListX = 220,
     animationListY = 10,
-    animationItemHeight = 30,
+    animationItemHeight = 26,
     scrollOffset = 0,
     maxVisibleItems = 15,
     
-    -- Mouse interaction
     hoveredAnimationIndex = nil,
+    hoveredAssetIndex = nil,
     
-    -- Drag-and-drop state
     droppedFiles = {},
     isDragging = false,
     currentAssetName = nil
@@ -150,6 +156,19 @@ function love.load()
     love.window.setTitle("Spine Playground - Interactive Animation Viewer")
     love.window.setMode(1024, 768)
     love.graphics.setBackgroundColor(playground.backgroundColor)
+    
+    playground.assetNames = {}
+    for name, _ in pairs(CONFIG.assets) do
+        table.insert(playground.assetNames, name)
+    end
+    table.sort(playground.assetNames)
+    playground.currentAssetIndex = 1
+    for i, name in ipairs(playground.assetNames) do
+        if name == CONFIG.currentAsset then
+            playground.currentAssetIndex = i
+            break
+        end
+    end
     
     -- Update CONFIG to center assets on screen
     local centerX = love.graphics.getWidth() / 2
@@ -212,6 +231,16 @@ function loadSpineAsset(assetName, customPaths, fileContents)
     
     playground.currentAssetName = assetName
     print("Loading asset: " .. (assetName or "custom"))
+    
+    if playground.assetNames then
+        playground.currentAssetIndex = nil
+        for i, name in ipairs(playground.assetNames) do
+            if name == assetName then
+                playground.currentAssetIndex = i
+                break
+            end
+        end
+    end
     
     
     -- Create Atlas from text
@@ -298,6 +327,28 @@ function loadSpineAsset(assetName, customPaths, fileContents)
     end
     
     return true
+end
+
+function setAssetByIndex(index)
+    if not playground.assetNames or index < 1 or index > #playground.assetNames then
+        return
+    end
+    
+    if playground.currentAssetIndex == index and playground.skeleton then
+        return
+    end
+    
+    local assetName = playground.assetNames[index]
+    CONFIG.currentAsset = assetName
+    playground.currentAssetIndex = index
+    
+    local success, err = loadSpineAsset(assetName)
+    if not success then
+        playground.loadError = err or "Failed to load assets"
+    else
+        playground.loadError = nil
+        playground.scrollOffset = 0
+    end
 end
 
 function setAnimation(index)
@@ -404,6 +455,75 @@ end
 function drawUI()
     local mouseX, mouseY = love.mouse.getPosition()
     playground.hoveredAnimationIndex = nil
+    playground.hoveredAssetIndex = nil
+    
+    local hudWidth = 100
+    local hudHeight = 30
+    local hudX = 10
+    local hudY = love.graphics.getHeight() - hudHeight - 10
+    
+    love.graphics.setColor(0, 0, 0, 0.7)
+    love.graphics.rectangle("fill", hudX, hudY, hudWidth, hudHeight, 5, 5)
+    
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.setFont(love.graphics.newFont(12))
+    local hudLabel = playground.showHud and "Hide HUD" or "Show HUD"
+    love.graphics.printf(hudLabel, hudX, hudY + 8, hudWidth, "center")
+    love.graphics.setFont(love.graphics.newFont(14))
+    
+    if not playground.showHud then
+        return
+    end
+    
+    local assetX = playground.assetListX
+    local assetY = playground.assetListY
+    local assetWidth = playground.assetListWidth
+    local assetHeight = 0
+    
+    if #playground.assetNames > 0 then
+        assetHeight = math.min(#playground.assetNames * playground.assetItemHeight + 50, 
+                               playground.assetMaxVisibleItems * playground.assetItemHeight + 50)
+        
+        love.graphics.setColor(0, 0, 0, 0.8)
+        love.graphics.rectangle("fill", assetX, assetY, assetWidth, assetHeight, 5, 5)
+        
+        love.graphics.setColor(0.2, 0.4, 0.7)
+        love.graphics.rectangle("fill", assetX, assetY, assetWidth, 40, 5, 5)
+        
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.printf("ASSETS", assetX, assetY + 10, assetWidth, "center")
+        love.graphics.setFont(love.graphics.newFont(12))
+        love.graphics.printf(#playground.assetNames .. " total", assetX, assetY + 25, assetWidth, "center")
+        love.graphics.setFont(love.graphics.newFont(14))
+        
+        local assetStartY = assetY + 50
+        local assetVisibleStart = playground.assetScrollOffset
+        local assetVisibleEnd = math.min(playground.assetScrollOffset + playground.assetMaxVisibleItems, #playground.assetNames)
+        
+        for i = assetVisibleStart + 1, assetVisibleEnd do
+            local itemY = assetStartY + (i - assetVisibleStart - 1) * playground.assetItemHeight
+            local name = playground.assetNames[i]
+            local isCurrentAsset = playground.currentAssetIndex and i == playground.currentAssetIndex
+            local isAssetHovered = mouseX >= assetX and mouseX <= assetX + assetWidth and
+                                   mouseY >= itemY and mouseY <= itemY + playground.assetItemHeight
+            
+            if isAssetHovered then
+                playground.hoveredAssetIndex = i
+            end
+            
+            if isCurrentAsset then
+                love.graphics.setColor(0.2, 0.6, 0.2, 0.5)
+                love.graphics.rectangle("fill", assetX + 5, itemY, assetWidth - 10, playground.assetItemHeight - 2)
+            elseif isAssetHovered then
+                love.graphics.setColor(0.3, 0.3, 0.4, 0.5)
+                love.graphics.rectangle("fill", assetX + 5, itemY, assetWidth - 10, playground.assetItemHeight - 2)
+            end
+            
+            local assetTextColor = isCurrentAsset and {0.3, 1, 0.3} or {0.9, 0.9, 0.9}
+            love.graphics.setColor(assetTextColor)
+            love.graphics.print(name, assetX + 15, itemY + 5)
+        end
+    end
     
     -- Animation list panel
     local listX = playground.animationListX
@@ -562,23 +682,77 @@ function love.keypressed(key)
 end
 
 function love.mousepressed(x, y, button)
-    if button == 1 and playground.hoveredAnimationIndex then
-        setAnimation(playground.hoveredAnimationIndex)
+    local hudWidth = 100
+    local hudHeight = 30
+    local hudX = 10
+    local hudY = love.graphics.getHeight() - hudHeight - 10
+    
+    if button == 1 then
+        if x >= hudX and x <= hudX + hudWidth and y >= hudY and y <= hudY + hudHeight then
+            playground.showHud = not playground.showHud
+            return
+        end
+        
+        if playground.showHud and playground.hoveredAssetIndex then
+            setAssetByIndex(playground.hoveredAssetIndex)
+            return
+        end
+        
+        if playground.showHud and playground.hoveredAnimationIndex then
+            setAnimation(playground.hoveredAnimationIndex)
+            return
+        end
+    elseif button == 2 then
+        playground.isDragging = true
+    end
+end
+
+function love.mousereleased(x, y, button)
+    if button == 2 then
+        playground.isDragging = false
+    end
+end
+
+function love.mousemoved(x, y, dx, dy, istouch)
+    if playground.isDragging and playground.skeleton then
+        playground.skeletonX = playground.skeletonX + dx
+        playground.skeletonY = playground.skeletonY + dy
     end
 end
 
 function love.wheelmoved(x, y)
-    -- Scroll animation list
+    local mouseX, mouseY = love.mouse.getPosition()
+    
+    if not playground.showHud then
+        local zoomDelta = y * 0.1
+        playground.scale = math.max(0.1, math.min(3.0, playground.scale + zoomDelta))
+        return
+    end
+    
+    local assetX = playground.assetListX
+    local assetWidth = playground.assetListWidth
+    
+    if mouseX >= assetX and mouseX <= assetX + assetWidth then
+        playground.assetScrollOffset = math.max(0, math.min(
+            playground.assetScrollOffset - y,
+            math.max(0, #playground.assetNames - playground.assetMaxVisibleItems)
+        ))
+        return
+    end
+    
     local listX = playground.animationListX
     local listWidth = playground.animationListWidth
-    local mouseX, mouseY = love.mouse.getPosition()
     
     if mouseX >= listX and mouseX <= listX + listWidth then
         playground.scrollOffset = math.max(0, math.min(
             playground.scrollOffset - y,
             math.max(0, #playground.animations - playground.maxVisibleItems)
         ))
+        return
     end
+    
+    local zoomDelta = y * 0.1
+    playground.scale = math.max(0.1, math.min(3.0, playground.scale + zoomDelta))
 end
 
 function love.resize(w, h)
